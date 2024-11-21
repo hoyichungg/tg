@@ -1,10 +1,8 @@
-import React, { useState } from "react";
-
+import React, { useEffect, useState } from "react";
 import DeleteOutlined from "@ant-design/icons/lib/icons/DeleteOutlined";
 import { Button, Divider, Input, Select, Space } from "antd";
-
+import { useSearchParams } from "react-router-dom";
 import useFiltersStore from "../../store/filtersStore";
-
 import { TagField } from "../Tag";
 
 interface FilterRow {
@@ -19,13 +17,22 @@ interface FilterFormProps {
 
 const FilterForm: React.FC<FilterFormProps> = ({ handleVisibleChange }) => {
   const { filters } = useFiltersStore();
-  const [filterRows, setFilterRows] = useState<FilterRow[]>([
-    {
-      id: Date.now(),
-      selectedKey: null,
-      selectedValues: [],
-    },
-  ]);
+  const [filterRows, setFilterRows] = useState<FilterRow[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const params = Object.fromEntries(searchParams.entries());
+    const initialFilters: FilterRow[] = Object.keys(params).map((key, index) => ({
+      id: index,
+      selectedKey: key,
+      selectedValues: params[key].split(","),
+    }));
+    setFilterRows(
+      initialFilters.length > 0
+        ? initialFilters
+        : [{ id: Date.now(), selectedKey: null, selectedValues: [] }]
+    );
+  }, [searchParams]);
 
   const getOptionsForKey = (key: string | null) => {
     if (!key) return [];
@@ -55,11 +62,7 @@ const FilterForm: React.FC<FilterFormProps> = ({ handleVisibleChange }) => {
   const addFilterRow = () => {
     setFilterRows((prevRows) => [
       ...prevRows,
-      {
-        id: Date.now(),
-        selectedKey: null,
-        selectedValues: [],
-      },
+      { id: Date.now(), selectedKey: null, selectedValues: [] },
     ]);
   };
 
@@ -97,18 +100,24 @@ const FilterForm: React.FC<FilterFormProps> = ({ handleVisibleChange }) => {
   };
 
   const handleSubmit = () => {
-    const validFilters = filterRows
-      .filter((row) => row.selectedKey && row.selectedValues.length > 0)
-      .map((row) => ({
-        key: row.selectedKey,
-        values: row.selectedValues,
-      }));
+    const validFilters = filterRows.filter(
+      (row) => row.selectedKey && row.selectedValues.length > 0
+    );
+    const params: Record<string, string> = {};
+
+    validFilters.forEach((filter) => {
+      if (filter.selectedKey) {
+        params[filter.selectedKey] = filter.selectedValues.join(",");
+      }
+    });
+
+    setSearchParams(params);
     handleVisibleChange(false);
-    console.log("Filters:", validFilters);
   };
 
   const handleReset = () => {
     setFilterRows([{ id: Date.now(), selectedKey: null, selectedValues: [] }]);
+    setSearchParams({});
   };
 
   const handleCancel = () => {
@@ -191,8 +200,6 @@ const FilterForm: React.FC<FilterFormProps> = ({ handleVisibleChange }) => {
                 value={
                   row.selectedKey === "activated"
                     ? row.selectedValues[0]
-                      ? "On"
-                      : "Off"
                     : row.selectedValues
                 }
                 onChange={(values) =>
